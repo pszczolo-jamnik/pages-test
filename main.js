@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x111111);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.03, 1000);
 camera.position.z = 1;
 
 const renderer = new THREE.WebGLRenderer();
@@ -27,32 +27,44 @@ const loader = new PLYLoader();
 
 let currentPoints = null;
 
-// fileInput.addEventListener('change', function(event) {
-//     const file = event.target.files[0];
-//     const reader = new FileReader();
+loader.setCustomPropertyNameMapping( {
+    generation: ['generation'],
+});
 
-    // reader.onload = function(event) {
 loader.load(
-    // URL.createObjectURL(file),
-    'kdtree_a_2.ply',
-    function(geometry) {
-        // Remove previous points if they exist
+    'flea_test_0.ply',
+    function (geometry) {
         if (currentPoints) {
             scene.remove(currentPoints);
         }
 
-        // Create points material
-        const material = new THREE.PointsMaterial( { color: 0xD0D0D0, size: 0.0003, sizeAttenuation: true } );
+        // Extract the 'generation' attribute
+        const generationAttribute = geometry.getAttribute('generation');
+        const colors = [];
+        const color = new THREE.Color();
 
-        // Create points
+        for (let i = 0; i < generationAttribute.count; i++) {
+            const generation = generationAttribute.getX(i);
+            color.setHSL(generation * 0.0018 + 0.35, 0.8, 0.5); // Adjust color mapping as needed
+            colors.push(color.r, color.g, color.b);
+        }
+
+        // Create a BufferAttribute for the colors
+        const colorAttribute = new THREE.Float32BufferAttribute(colors, 3);
+        geometry.setAttribute('color', colorAttribute);
+
+        // Create points material with vertex colors
+        const material = new THREE.PointsMaterial({
+            size: 0.0005,
+            vertexColors: true
+        });
+
         currentPoints = new THREE.Points(geometry, material);
 
-        // Center the geometry
         geometry.computeBoundingBox();
         const center = geometry.boundingBox.getCenter(new THREE.Vector3());
         currentPoints.position.sub(center);
 
-        // Auto-adjust camera distance based on bounding box
         const box = geometry.boundingBox;
         const maxDim = Math.max(
             box.max.x - box.min.x,
@@ -60,24 +72,19 @@ loader.load(
             box.max.z - box.min.z
         );
         camera.position.z = maxDim * 0.9;
-        // controls.target.copy(currentPoints.position);
-        // controls.target.copy(center);
         controls.target.set(0, 0, 0);
         controls.update();
 
         scene.add(currentPoints);
     },
-    function(xhr) {
+    function (xhr) {
         console.log((xhr.loaded / xhr.total * 100) + '% loaded');
     },
-    function(error) {
+    function (error) {
         console.error('Error loading PLY file:', error);
     }
 );
-    // };
 
-    // reader.readAsArrayBuffer(file);
-// });
 
 // Animation loop
 function animate() {
